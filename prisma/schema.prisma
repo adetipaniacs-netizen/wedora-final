@@ -1,0 +1,231 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// ═══════════════════════════════════════════
+// USER
+// ═══════════════════════════════════════════
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  password  String
+  phone     String?
+  role      Role     @default(USER)
+  bookings  Booking[]
+  cart      CartItem[]
+  reviews   Review[]
+  createdAt DateTime @default(now())
+
+  @@map("users")
+}
+
+enum Role {
+  USER
+  ADMIN
+  SUPER_ADMIN
+}
+
+// ═══════════════════════════════════════════
+// PACKAGE
+// ═══════════════════════════════════════════
+model Package {
+  id          String     @id @default(cuid())
+  name        String
+  slug        String     @unique
+  description String     @db.Text
+  basePrice   Int
+  imageUrl    String
+  facilities  String     @db.Text
+  category    String
+  active      Boolean    @default(true)
+  cartItems   CartItem[]
+  createdAt   DateTime   @default(now())
+
+  @@map("packages")
+}
+
+// ═══════════════════════════════════════════
+// VENDOR
+// ═══════════════════════════════════════════
+model Vendor {
+  id          String          @id @default(cuid())
+  name        String
+  category    VendorCategory
+  description String          @db.Text
+  price       Int
+  imageUrl    String
+  active      Boolean         @default(true)
+  cartItems   CartItem[]
+  bookings    Booking[]
+  services    VendorService[]
+
+  @@map("vendors")
+}
+
+enum VendorCategory {
+  CATERING
+  DECORATION
+  PHOTOGRAPHY
+  MUSIC
+  MUA
+  INVITATION
+  VENUE
+}
+
+// ═══════════════════════════════════════════
+// VENDOR SERVICE
+// ═══════════════════════════════════════════
+model VendorService {
+  id          String   @id @default(cuid())
+  vendorId    String
+  vendor      Vendor   @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  name        String
+  category    String
+  description String?  @db.Text
+  price       Int
+  priceUnit   String   @default("PER_PACKAGE")
+  minQty      Int      @default(1)
+  maxQty      Int?
+  active      Boolean  @default(true)
+  bookings    Booking[]
+  createdAt   DateTime @default(now())
+
+  @@map("vendor_services")
+}
+
+// ═══════════════════════════════════════════
+// PROMO
+// ═══════════════════════════════════════════
+model Promo {
+  id          String    @id @default(cuid())
+  code        String    @unique
+  title       String
+  description String    @db.Text
+  type        PromoType
+  value       Int
+  minPurchase Int       @default(0)
+  maxDiscount Int?
+  quota       Int
+  used        Int       @default(0)
+  validFrom   DateTime
+  validTo     DateTime
+  active      Boolean   @default(true)
+
+  @@map("promos")
+}
+
+enum PromoType {
+  PERCENTAGE
+  FIXED
+}
+
+// ═══════════════════════════════════════════
+// CART ITEM
+// ═══════════════════════════════════════════
+model CartItem {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  packageId String?
+  package   Package? @relation(fields: [packageId], references: [id])
+  vendorId  String?
+  vendor    Vendor?  @relation(fields: [vendorId], references: [id])
+  qty       Int      @default(1)
+  createdAt DateTime @default(now())
+
+  @@map("cart_items")
+}
+
+// ═══════════════════════════════════════════
+// BOOKING
+// ═══════════════════════════════════════════
+model Booking {
+  id              String         @id @default(cuid())
+  userId          String
+  user            User           @relation(fields: [userId], references: [id])
+  bookingType     String         @default("PACKAGE")
+  packageId       String?
+  vendorId        String?
+  vendor          Vendor?        @relation(fields: [vendorId], references: [id])
+  vendorServiceId String?
+  vendorService   VendorService? @relation(fields: [vendorServiceId], references: [id])
+  qty             Int            @default(1)
+  serviceCategory String?
+  weddingDate     DateTime
+  brideName       String
+  groomName       String
+  phone           String
+  venueAddress    String         @db.Text
+  notes           String?        @db.Text
+  itemsSnapshot   String         @db.Text
+  basePrice       Int
+  weekendFee      Int            @default(0)
+  seasonFee       Int            @default(0)
+  promoDiscount   Int            @default(0)
+  promoCode       String?
+  totalPrice      Int
+  dpAmount        Int
+  remaining       Int
+  status          BookingStatus  @default(PENDING)
+  paymentStatus   PaymentStatus  @default(UNPAID)
+  paidAt          DateTime?
+  createdAt       DateTime       @default(now())
+
+  @@map("bookings")
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  UNPAID
+  DP_PAID
+  FULLY_PAID
+}
+
+// ═══════════════════════════════════════════
+// PRICING RULE
+// ═══════════════════════════════════════════
+model PricingRule {
+  id         String   @id @default(cuid())
+  name       String
+  priority   Int      @default(10)
+  conditions String   @db.Text
+  adjustment String   @db.Text
+  active     Boolean  @default(true)
+  createdAt  DateTime @default(now())
+
+  @@map("pricing_rules")
+}
+
+// ═══════════════════════════════════════════
+// REVIEW (Testimoni & Rating)
+// ═══════════════════════════════════════════
+model Review {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bookingId   String   @unique
+  vendorId    String?
+  packageId   String?
+  rating      Int      @default(5)
+  comment     String   @db.Text
+  displayName String
+  photoUrl    String?
+  featured    Boolean  @default(false)
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  @@map("reviews")
+}
